@@ -77,9 +77,32 @@ export default function Dashboard({ user, role }: { user: User, role: string | n
     }
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast.success("Copied to clipboard!");
+  const copyToClipboard = async (text: string) => {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        toast.success("Copied to clipboard!");
+      } else {
+        // Fallback for non-secure contexts or older browsers
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-9999px";
+        textArea.style.top = "-9999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+          document.execCommand('copy');
+          toast.success("Copied to clipboard!");
+        } catch (err) {
+          toast.error("Failed to copy link");
+        }
+        document.body.removeChild(textArea);
+      }
+    } catch (error) {
+      toast.error("Failed to copy link");
+    }
   };
 
   const filteredLinks = links.filter(link => 

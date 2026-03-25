@@ -109,10 +109,32 @@ export default function UsersManagement() {
     }
   };
 
-  const copyInviteLink = () => {
+  const copyInviteLink = async () => {
     const link = `${window.location.origin}/login?mode=signup`;
-    navigator.clipboard.writeText(link);
-    toast.success("Invite link copied to clipboard!");
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(link);
+        toast.success("Invite link copied to clipboard!");
+      } else {
+        const textArea = document.createElement("textarea");
+        textArea.value = link;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-9999px";
+        textArea.style.top = "-9999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+          document.execCommand('copy');
+          toast.success("Invite link copied to clipboard!");
+        } catch (err) {
+          toast.error("Failed to copy link");
+        }
+        document.body.removeChild(textArea);
+      }
+    } catch (error) {
+      toast.error("Failed to copy link");
+    }
   };
 
   const deleteInvite = async (email: string) => {
