@@ -1,16 +1,5 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { User } from "firebase/auth";
-import { 
-  doc, 
-  getDoc, 
-  collection, 
-  query, 
-  orderBy, 
-  limit, 
-  onSnapshot 
-} from "firebase/firestore";
-import { db } from "../lib/firebase";
 import { 
   BarChart, 
   Bar, 
@@ -42,6 +31,12 @@ import { format, subDays, isSameDay } from "date-fns";
 import { GoogleGenAI } from "@google/genai";
 import Markdown from "react-markdown";
 
+interface User {
+  uid: string;
+  email: string;
+  role: string;
+}
+
 const COLORS = ["#f97316", "#3b82f6", "#a855f7", "#22c55e", "#eab308"];
 
 // Lazy initialization of Gemini AI
@@ -69,41 +64,36 @@ export default function Analytics({ user, role }: { user: User, role: string | n
   useEffect(() => {
     if (!linkId) return;
 
-    const fetchLink = async () => {
-      const docRef = doc(db, "links", linkId);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const data = docSnap.data({ serverTimestamps: 'estimate' });
-        if (data.ownerUid !== user.uid && role !== "admin") {
-          toast.error("Unauthorized access");
-          navigate("/");
-          return;
+    const fetchAnalytics = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        
+        // Fetch link details
+        const linkRes = await fetch(`/api/links/${linkId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!linkRes.ok) throw new Error("Link not found");
+        const linkData = await linkRes.json();
+        setLink(linkData);
+
+        // Fetch clicks
+        const clicksRes = await fetch(`/api/analytics/${linkId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (clicksRes.ok) {
+          const clicksData = await clicksRes.json();
+          setClicks(clicksData);
         }
-        setLink({ id: docSnap.id, ...data });
-      } else {
-        toast.error("Link not found");
+      } catch (error) {
+        console.error("Analytics error:", error);
+        toast.error("Failed to load analytics");
         navigate("/");
+      } finally {
+        setLoading(false);
       }
     };
 
-    fetchLink();
-
-    const q = query(
-      collection(db, "links", linkId, "clicks"),
-      orderBy("timestamp", "desc"),
-      limit(1000)
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const clicksData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data({ serverTimestamps: 'estimate' })
-      }));
-      setClicks(clicksData);
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
+    fetchAnalytics();
   }, [linkId, user.uid, role, navigate]);
 
   const generateAiReport = async () => {
@@ -159,7 +149,7 @@ export default function Analytics({ user, role }: { user: User, role: string | n
   // Data Processing
   const last7Days = Array.from({ length: 7 }, (_, i) => {
     const date = subDays(new Date(), i);
-    const count = clicks.filter(c => isSameDay(c.timestamp.toDate(), date)).length;
+    const count = clicks.filter(c => isSameDay(new Date(c.timestamp), date)).length;
     return {
       date: format(date, "MMM d"),
       clicks: count

@@ -1,7 +1,4 @@
 import { useState } from "react";
-import { User } from "firebase/auth";
-import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore";
-import { db, handleFirestoreError, OperationType } from "../lib/firebase";
 import { toast } from "sonner";
 import { 
   X, 
@@ -30,6 +27,12 @@ const getAi = () => {
   }
   return aiInstance;
 };
+
+interface User {
+  uid: string;
+  email: string;
+  role: string;
+}
 
 export default function LinkCreator({ user, onClose }: { user: User, onClose: () => void }) {
   const [originalUrl, setOriginalUrl] = useState("");
@@ -170,56 +173,36 @@ export default function LinkCreator({ user, onClose }: { user: User, onClose: ()
       return;
     }
 
-    const path = `links/${id}`;
-    
     try {
-      // Check if alias exists
-      const docRef = doc(db, "links", id);
-      let docSnap;
-      try {
-        docSnap = await getDoc(docRef);
-      } catch (err) {
-        handleFirestoreError(err, OperationType.GET, path);
-      }
-      
-      if (docSnap && docSnap.exists()) {
-        toast.error("This alias is already taken. Please choose another.");
-        setLoading(false);
-        return;
-      }
-
-      try {
-        await setDoc(docRef, {
+      const token = localStorage.getItem("token");
+      const response = await fetch("/api/links", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
           id,
-          ownerUid: user.uid,
           originalUrl: finalUrl,
-          lang,
+          utmSource: campaignSource,
+          utmMedium: campaignMedium,
           utmCampaign,
-          campaignId,
           utmTerm,
           utmContent,
-          campaignSource,
-          campaignMedium,
-          category,
-          affiliateId,
-          referrerId,
-          clickCount: 0,
-          createdAt: serverTimestamp(),
-        });
-      } catch (err) {
-        handleFirestoreError(err, OperationType.WRITE, path);
+          campaignId
+        })
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to create link");
       }
 
       toast.success("Link created successfully!");
       onClose();
     } catch (error: any) {
       console.error("Link creation error:", error);
-      try {
-        const errorData = JSON.parse(error.message);
-        toast.error(`Failed to create link: ${errorData.error}`);
-      } catch {
-        toast.error("Failed to create link. Check console for details.");
-      }
+      toast.error(error.message || "Failed to create link");
     } finally {
       setLoading(false);
     }

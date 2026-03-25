@@ -1,29 +1,17 @@
 import { useState, useEffect } from "react";
 import { 
-  collection, 
-  query, 
-  onSnapshot, 
-  doc, 
-  updateDoc, 
-  deleteDoc,
-  orderBy,
-  setDoc,
-  serverTimestamp,
-  getDoc
-} from "firebase/firestore";
-import { db, handleFirestoreError, OperationType } from "../lib/firebase";
-import { 
   Users, 
   Shield, 
   User as UserIcon, 
   Trash2, 
   Search,
   Loader2,
-  CheckCircle2,
   XCircle,
   UserPlus,
   Copy,
-  Mail as MailIcon
+  Mail as MailIcon,
+  Lock,
+  UserCheck
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { toast } from "sonner";
@@ -52,35 +40,40 @@ export default function UsersManagement() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("client");
   const [isInviting, setIsInviting] = useState(false);
+  const [isDirectCreation, setIsDirectCreation] = useState(false);
+  const [password, setPassword] = useState("");
 
   useEffect(() => {
-    // Fetch users
-    const qUsers = query(collection(db, "users"), orderBy("createdAt", "desc"));
-    const unsubscribeUsers = onSnapshot(qUsers, (snapshot) => {
-      const usersData = snapshot.docs.map(doc => ({
-        ...doc.data()
-      })) as UserProfile[];
-      setUsers(usersData);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, "users");
-    });
+    const fetchData = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        
+        // Fetch users
+        const usersRes = await fetch("/api/users", {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (usersRes.ok) {
+          const usersData = await usersRes.json();
+          setUsers(usersData);
+        }
 
-    // Fetch invites
-    const qInvites = query(collection(db, "invites"), orderBy("createdAt", "desc"));
-    const unsubscribeInvites = onSnapshot(qInvites, (snapshot) => {
-      const invitesData = snapshot.docs.map(doc => ({
-        ...doc.data()
-      })) as Invite[];
-      setInvites(invitesData);
-      setLoading(false);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, "invites");
-    });
-
-    return () => {
-      unsubscribeUsers();
-      unsubscribeInvites();
+        // Fetch invites
+        const invitesRes = await fetch("/api/invites", {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (invitesRes.ok) {
+          const invitesData = await invitesRes.json();
+          setInvites(invitesData);
+        }
+      } catch (error) {
+        console.error("Error fetching management data:", error);
+        toast.error("Failed to load users and invites");
+      } finally {
+        setLoading(false);
+      }
     };
+
+    fetchData();
   }, []);
 
   const handleInvite = async (e: React.FormEvent) => {
@@ -89,21 +82,61 @@ export default function UsersManagement() {
     setIsInviting(true);
 
     try {
-      const emailLower = inviteEmail.toLowerCase();
-      const inviteRef = doc(db, "invites", emailLower);
-      
-      await setDoc(inviteRef, {
-        email: emailLower,
-        role: inviteRole,
-        status: "pending",
-        createdAt: serverTimestamp()
-      });
+      const token = localStorage.getItem("token");
+      if (isDirectCreation) {
+        if (!password || password.length < 6) {
+          toast.error("Password must be at least 6 characters");
+          setIsInviting(false);
+          return;
+        }
 
-      toast.success("User invited successfully!");
+        const response = await fetch("/api/admin/create-user", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            email: inviteEmail.toLowerCase(),
+            password,
+            role: inviteRole,
+          }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to create user");
+        }
+
+        setUsers([{ uid: data.uid, email: inviteEmail.toLowerCase(), role: inviteRole, createdAt: new Date() }, ...users]);
+        toast.success("User created successfully!");
+      } else {
+        const response = await fetch("/api/invites", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            email: inviteEmail.toLowerCase(),
+            role: inviteRole,
+          }),
+        });
+
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || "Failed to invite user");
+        }
+
+        setInvites([{ email: inviteEmail.toLowerCase(), role: inviteRole, status: "pending", createdAt: new Date() }, ...invites]);
+        toast.success("User invited successfully!");
+      }
+      
       setInviteEmail("");
+      setPassword("");
       setShowInviteModal(false);
-    } catch (error) {
-      toast.error("Failed to invite user");
+    } catch (error: any) {
+      toast.error(error.message || "Operation failed");
     } finally {
       setIsInviting(false);
     }
@@ -139,8 +172,17 @@ export default function UsersManagement() {
 
   const deleteInvite = async (email: string) => {
     try {
-      await deleteDoc(doc(db, "invites", email));
-      toast.success("Invite deleted");
+      const token = localStorage.getItem("token");
+      const response = await fetch(`/api/invites/${email}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (response.ok) {
+        setInvites(invites.filter(i => i.email !== email));
+        toast.success("Invite deleted");
+      } else {
+        toast.error("Failed to delete invite");
+      }
     } catch (error) {
       toast.error("Failed to delete invite");
     }
@@ -149,22 +191,42 @@ export default function UsersManagement() {
   const toggleRole = async (userId: string, currentRole: string) => {
     const newRole = currentRole === "admin" ? "client" : "admin";
     try {
-      await updateDoc(doc(db, "users", userId), {
-        role: newRole
+      const token = localStorage.getItem("token");
+      const response = await fetch(`/api/users/${userId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ role: newRole })
       });
-      toast.success(`User role updated to ${newRole}`);
+      if (response.ok) {
+        setUsers(users.map(u => u.uid === userId ? { ...u, role: newRole } : u));
+        toast.success(`User role updated to ${newRole}`);
+      } else {
+        toast.error("Failed to update user role");
+      }
     } catch (error) {
       toast.error("Failed to update user role");
     }
   };
 
   const deleteUser = async (userId: string) => {
-    if (!window.confirm("Are you sure you want to delete this user profile? This will not delete their Auth account, only their profile data.")) return;
+    if (!window.confirm("Are you sure you want to delete this user? This will delete their account and profile.")) return;
     try {
-      await deleteDoc(doc(db, "users", userId));
-      toast.success("User profile deleted");
+      const token = localStorage.getItem("token");
+      const response = await fetch(`/api/users/${userId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (response.ok) {
+        setUsers(users.filter(u => u.uid !== userId));
+        toast.success("User deleted");
+      } else {
+        toast.error("Failed to delete user");
+      }
     } catch (error) {
-      toast.error("Failed to delete user profile");
+      toast.error("Failed to delete user");
     }
   };
 
@@ -226,10 +288,28 @@ export default function UsersManagement() {
               className="bg-zinc-900 border border-zinc-800 w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden"
             >
               <div className="p-8 border-b border-zinc-800 flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-white tracking-tight">Invite New User</h2>
+                <h2 className="text-2xl font-bold text-white tracking-tight">
+                  {isDirectCreation ? "Create New User" : "Invite New User"}
+                </h2>
                 <button onClick={() => setShowInviteModal(false)} className="p-2 hover:bg-zinc-800 rounded-full transition-colors">
                   <XCircle className="w-6 h-6 text-zinc-500" />
                 </button>
+              </div>
+              <div className="px-8 pt-6">
+                <div className="flex bg-zinc-800 p-1 rounded-xl">
+                  <button
+                    onClick={() => setIsDirectCreation(false)}
+                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${!isDirectCreation ? 'bg-zinc-700 text-white shadow-lg' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  >
+                    Invitation Mode
+                  </button>
+                  <button
+                    onClick={() => setIsDirectCreation(true)}
+                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${isDirectCreation ? 'bg-zinc-700 text-white shadow-lg' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  >
+                    Direct Creation
+                  </button>
+                </div>
               </div>
               <form onSubmit={handleInvite} className="p-8 space-y-6">
                 <div className="space-y-2">
@@ -246,6 +326,28 @@ export default function UsersManagement() {
                     />
                   </div>
                 </div>
+
+                {isDirectCreation && (
+                  <motion.div 
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    className="space-y-2"
+                  >
+                    <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Password</label>
+                    <div className="relative">
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+                      <input
+                        type="password"
+                        required
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full bg-zinc-800 border border-zinc-700 rounded-xl py-3 pl-12 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-orange-500/50 transition-all"
+                      />
+                    </div>
+                  </motion.div>
+                )}
+
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Role</label>
                   <select
@@ -263,17 +365,19 @@ export default function UsersManagement() {
                     disabled={isInviting}
                     className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 px-6 rounded-2xl transition-all flex items-center justify-center gap-2 group disabled:opacity-50"
                   >
-                    {isInviting ? <Loader2 className="w-5 h-5 animate-spin" /> : <UserPlus className="w-5 h-5" />}
-                    <span>Send Invite</span>
+                    {isInviting ? <Loader2 className="w-5 h-5 animate-spin" /> : (isDirectCreation ? <UserCheck className="w-5 h-5" /> : <UserPlus className="w-5 h-5" />)}
+                    <span>{isDirectCreation ? "Create User Now" : "Send Invite"}</span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={copyInviteLink}
-                    className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-bold py-4 px-6 rounded-2xl transition-all flex items-center justify-center gap-2"
-                  >
-                    <Copy className="w-5 h-5" />
-                    <span>Copy Invite Link</span>
-                  </button>
+                  {!isDirectCreation && (
+                    <button
+                      type="button"
+                      onClick={copyInviteLink}
+                      className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-bold py-4 px-6 rounded-2xl transition-all flex items-center justify-center gap-2"
+                    >
+                      <Copy className="w-5 h-5" />
+                      <span>Copy Invite Link</span>
+                    </button>
+                  )}
                 </div>
               </form>
             </motion.div>
@@ -328,7 +432,7 @@ export default function UsersManagement() {
                     </td>
                     <td className="px-8 py-6">
                       <p className="text-zinc-400 text-sm">
-                        {user.createdAt?.toDate().toLocaleDateString() || "N/A"}
+                        {new Date(user.createdAt).toLocaleDateString() || "N/A"}
                       </p>
                     </td>
                     <td className="px-8 py-6 text-right">

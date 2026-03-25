@@ -1,15 +1,4 @@
 import { useState, useEffect } from "react";
-import { User } from "firebase/auth";
-import { 
-  collection, 
-  query, 
-  where, 
-  orderBy, 
-  onSnapshot, 
-  deleteDoc, 
-  doc 
-} from "firebase/firestore";
-import { db } from "../lib/firebase";
 import { toast } from "sonner";
 import { 
   Plus, 
@@ -29,6 +18,12 @@ import LinkCreator from "./LinkCreator";
 import { Link as RouterLink } from "react-router-dom";
 import { format } from "date-fns";
 
+interface User {
+  uid: string;
+  email: string;
+  role: string;
+}
+
 export default function Dashboard({ user, role }: { user: User, role: string | null }) {
   const [links, setLinks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,41 +31,49 @@ export default function Dashboard({ user, role }: { user: User, role: string | n
   const [showCreator, setShowCreator] = useState(false);
 
   useEffect(() => {
-    let q;
-    if (role === "admin") {
-      q = query(
-        collection(db, "links"),
-        orderBy("createdAt", "desc")
-      );
-    } else {
-      q = query(
-        collection(db, "links"),
-        where("ownerUid", "==", user.uid),
-        orderBy("createdAt", "desc")
-      );
+    const fetchLinks = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const response = await fetch("/api/links", {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setLinks(data);
+        } else {
+          toast.error("Failed to load links");
+        }
+      } catch (error) {
+        console.error("Dashboard error:", error);
+        toast.error("Failed to load links");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (user) {
+      fetchLinks();
     }
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const linksData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data({ serverTimestamps: 'estimate' })
-      }));
-      setLinks(linksData);
-      setLoading(false);
-    }, (error) => {
-      console.error("Dashboard error:", error);
-      toast.error("Failed to load links");
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [user.uid, role]);
+  }, [user, role]);
 
   const handleDelete = async (id: string) => {
     if (window.confirm("Are you sure you want to delete this link?")) {
       try {
-        await deleteDoc(doc(db, "links", id));
-        toast.success("Link deleted");
+        const token = localStorage.getItem("token");
+        const response = await fetch(`/api/links/${id}`, {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+        if (response.ok) {
+          setLinks(links.filter(l => l.id !== id));
+          toast.success("Link deleted");
+        } else {
+          toast.error("Failed to delete link");
+        }
       } catch (error) {
         toast.error("Failed to delete link");
       }
@@ -210,7 +213,7 @@ export default function Dashboard({ user, role }: { user: User, role: string | n
                   <div className="flex flex-wrap gap-4 text-xs text-zinc-400 font-medium">
                     <div className="flex items-center gap-1.5">
                       <Calendar className="w-3.5 h-3.5" />
-                      <span>{format(link.createdAt.toDate(), "MMM d, yyyy")}</span>
+                      <span>{format(new Date(link.createdAt), "MMM d, yyyy")}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <MousePointerClick className="w-3.5 h-3.5" />

@@ -5,9 +5,6 @@
 
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { onAuthStateChanged, User } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
-import { auth, db } from "./lib/firebase";
 import { Toaster } from "sonner";
 import Auth from "./components/Auth";
 import Dashboard from "./components/Dashboard";
@@ -16,33 +13,48 @@ import Analytics from "./components/Analytics";
 import UsersManagement from "./components/UsersManagement";
 import ErrorBoundary from "./components/ErrorBoundary";
 
+export interface User {
+  uid: string;
+  email: string;
+  role: string;
+}
+
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
-  const [role, setRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
-      if (currentUser) {
-        try {
-          const userDoc = await getDoc(doc(db, "users", currentUser.uid));
-          if (userDoc.exists()) {
-            setRole(userDoc.data().role || "client");
-          } else {
-            setRole("client");
-          }
-        } catch (error) {
-          console.error("Error fetching user role:", error);
-          setRole("client");
-        }
-      } else {
-        setRole(null);
+    const token = localStorage.getItem("token");
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split(".")[1]));
+        setUser({
+          uid: payload.uid,
+          email: payload.email,
+          role: payload.role
+        });
+      } catch (error) {
+        console.error("Error parsing token:", error);
+        localStorage.removeItem("token");
       }
-      setLoading(false);
-    });
-    return () => unsubscribe();
+    }
+    setLoading(false);
   }, []);
+
+  const login = (token: string) => {
+    localStorage.setItem("token", token);
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    setUser({
+      uid: payload.uid,
+      email: payload.email,
+      role: payload.role
+    });
+  };
+
+  const logout = () => {
+    localStorage.removeItem("token");
+    setUser(null);
+  };
 
   if (loading) {
     return (
@@ -57,14 +69,14 @@ export default function App() {
       <Router>
         <Toaster position="top-right" theme="dark" />
         <Routes>
-          <Route path="/login" element={!user ? <Auth /> : <Navigate to="/" />} />
+          <Route path="/login" element={!user ? <Auth onLogin={login} /> : <Navigate to="/" />} />
           <Route
             path="/"
-            element={user ? <Layout user={user} role={role} /> : <Navigate to="/login" />}
+            element={user ? <Layout user={user} role={user.role} onLogout={logout} /> : <Navigate to="/login" />}
           >
-            <Route index element={<Dashboard user={user!} role={role} />} />
-            <Route path="analytics/:linkId" element={<Analytics user={user!} role={role} />} />
-            {role === "admin" && (
+            <Route index element={<Dashboard user={user!} role={user?.role || null} />} />
+            <Route path="analytics/:linkId" element={<Analytics user={user!} role={user?.role || null} />} />
+            {user?.role === "admin" && (
               <Route path="users" element={<UsersManagement />} />
             )}
           </Route>

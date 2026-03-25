@@ -1,15 +1,13 @@
 import { useState, useEffect } from "react";
-import { 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword
-} from "firebase/auth";
-import { auth, db } from "../lib/firebase";
-import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore";
 import { toast } from "sonner";
 import { Link as LinkIcon, Mail, Lock, ArrowRight, Loader2 } from "lucide-react";
 import { motion } from "motion/react";
 
-export default function Auth() {
+interface AuthProps {
+  onLogin: (token: string) => void;
+}
+
+export default function Auth({ onLogin }: AuthProps) {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -27,42 +25,30 @@ export default function Auth() {
     e.preventDefault();
     setLoading(true);
     try {
+      const endpoint = isLogin ? "/api/auth/login" : "/api/auth/signup";
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Authentication failed");
+      }
+
       if (isLogin) {
-        await signInWithEmailAndPassword(auth, email, password);
+        onLogin(data.token);
         toast.success("Welcome back!");
       } else {
-        // Check if invited
-        const inviteRef = doc(db, "invites", email.toLowerCase());
-        const inviteSnap = await getDoc(inviteRef);
-        
-        if (!inviteSnap.exists()) {
-          toast.error("This email is not invited. Please contact the administrator.");
-          setLoading(false);
-          return;
+        // After successful signup, switch to login or auto-login if token provided
+        if (data.token) {
+          onLogin(data.token);
+          toast.success("Account created successfully!");
+        } else {
+          setIsLogin(true);
+          toast.success("Account created! Please sign in.");
         }
-
-        const inviteData = inviteSnap.data();
-        if (inviteData.status === "used") {
-          toast.error("This invite has already been used.");
-          setLoading(false);
-          return;
-        }
-
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        const user = userCredential.user;
-        
-        // Create user profile in Firestore
-        await setDoc(doc(db, "users", user.uid), {
-          uid: user.uid,
-          email: user.email,
-          role: inviteData.role || "client",
-          createdAt: serverTimestamp(),
-        });
-
-        // Mark invite as used
-        await setDoc(inviteRef, { status: "used" }, { merge: true });
-        
-        toast.success("Account created successfully!");
       }
     } catch (error: any) {
       toast.error(error.message);
@@ -142,7 +128,15 @@ export default function Auth() {
 
           <p className="mt-8 text-center text-sm text-zinc-400">
             {isLogin ? (
-              "Access restricted to invited users only."
+              <>
+                Access restricted to invited users only.{" "}
+                <button
+                  onClick={() => setIsLogin(false)}
+                  className="text-orange-500 font-bold hover:underline"
+                >
+                  Create Account
+                </button>
+              </>
             ) : (
               <>
                 Already have an account?{" "}

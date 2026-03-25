@@ -1,16 +1,21 @@
 import { Outlet, Link, useNavigate } from "react-router-dom";
-import { User, signOut } from "firebase/auth";
-import { auth } from "../lib/firebase";
 import { LayoutDashboard, LogOut, BarChart3, Link as LinkIcon, Menu, X, Users } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
+import { User } from "../App";
 
-export default function Layout({ user, role }: { user: User, role: string | null }) {
+interface LayoutProps {
+  user: User;
+  role: string | null;
+  onLogout: () => void;
+}
+
+export default function Layout({ user, role, onLogout }: LayoutProps) {
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  const handleSignOut = async () => {
-    await signOut(auth);
+  const handleSignOut = () => {
+    onLogout();
     navigate("/login");
   };
 
