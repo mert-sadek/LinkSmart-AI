@@ -1,11 +1,11 @@
 import { Outlet, Link, useNavigate } from "react-router-dom";
 import { User, signOut } from "firebase/auth";
 import { auth } from "../lib/firebase";
-import { LayoutDashboard, LogOut, BarChart3, Link as LinkIcon, Menu, X } from "lucide-react";
+import { LayoutDashboard, LogOut, BarChart3, Link as LinkIcon, Menu, X, Users } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 
-export default function Layout({ user }: { user: User }) {
+export default function Layout({ user, role }: { user: User, role: string | null }) {
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -33,6 +33,16 @@ export default function Layout({ user }: { user: User }) {
             <LayoutDashboard className="w-5 h-5 text-zinc-400" />
             <span>Dashboard</span>
           </Link>
+
+          {role === "admin" && (
+            <Link
+              to="/users"
+              className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-zinc-800 transition-colors"
+            >
+              <Users className="w-5 h-5 text-zinc-400" />
+              <span>Users</span>
+            </Link>
+          )}
         </nav>
 
         <div className="p-4 border-t border-zinc-800">
@@ -106,6 +116,17 @@ export default function Layout({ user }: { user: User }) {
                   <LayoutDashboard className="w-5 h-5 text-zinc-400" />
                   <span>Dashboard</span>
                 </Link>
+
+                {role === "admin" && (
+                  <Link
+                    to="/users"
+                    onClick={() => setIsSidebarOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-zinc-800 transition-colors"
+                  >
+                    <Users className="w-5 h-5 text-zinc-400" />
+                    <span>Users</span>
+                  </Link>
+                )}
               </nav>
 
               <div className="p-4 border-t border-zinc-800">

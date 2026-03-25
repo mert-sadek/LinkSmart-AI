@@ -41,7 +41,7 @@ service cloud.firestore {
       return isAuthenticated() &&
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-          (request.auth.token.email == "mert@istrealestate.ae" && request.auth.token.email_verified == true));
+          (request.auth.token.email == "mert.sadek.91@gmail.com" && request.auth.token.email_verified == true));
     }
     function uidUnchanged() {
       return !('ownerUid' in request.resource.data) || request.resource.data.ownerUid == request.auth.uid;
