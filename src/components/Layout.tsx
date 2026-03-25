@@ -22,7 +22,7 @@ export default function Layout({ user, role }: { user: User, role: string | null
           <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center">
             <LinkIcon className="text-white w-5 h-5" />
           </div>
-          <span className="text-xl font-bold tracking-tight">LinkSmart AI</span>
+          <span className="text-xl font-bold tracking-tight">IST Links</span>
         </div>
         
         <nav className="flex-1 px-4 py-4 space-y-2">
@@ -70,7 +70,7 @@ export default function Layout({ user, role }: { user: User, role: string | null
           <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center">
             <LinkIcon className="text-white w-5 h-5" />
           </div>
-          <span className="text-lg font-bold tracking-tight">LinkSmart</span>
+          <span className="text-lg font-bold tracking-tight">IST Links</span>
         </div>
         <button onClick={() => setIsSidebarOpen(true)}>
           <Menu className="w-6 h-6" />
@@ -100,7 +100,7 @@ export default function Layout({ user, role }: { user: User, role: string | null
                   <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center">
                     <LinkIcon className="text-white w-5 h-5" />
                   </div>
-                  <span className="text-xl font-bold tracking-tight">LinkSmart AI</span>
+                  <span className="text-xl font-bold tracking-tight">IST Links</span>
                 </div>
                 <button onClick={() => setIsSidebarOpen(false)}>
                   <X className="w-6 h-6" />

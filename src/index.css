@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
+@theme {
+  --color-zinc-950: #18112E;
+  --color-zinc-900: #1F173B;
+  --color-zinc-800: #2A214D;
+  --color-zinc-700: #362B5E;
+  --color-orange-500: #E28829;
+  --color-orange-600: #C77622;
+}
+
 @layer base {
   .custom-scrollbar::-webkit-scrollbar {
     width: 8px;

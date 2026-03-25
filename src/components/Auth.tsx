@@ -88,8 +88,8 @@ export default function Auth() {
             </h1>
             <p className="text-zinc-400 text-sm">
               {isLogin 
-                ? "Manage your links and analytics with LinkSmart AI" 
-                : "Join thousands of marketers optimizing their links"}
+                ? "Manage your links and analytics with IST Links" 
+                : "Join the IST team and optimize your campaign links"}
             </p>
           </div>
 
