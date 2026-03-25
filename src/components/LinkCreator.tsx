@@ -23,11 +23,16 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 export default function LinkCreator({ user, onClose }: { user: User, onClose: () => void }) {
   const [originalUrl, setOriginalUrl] = useState("");
   const [customAlias, setCustomAlias] = useState("");
+  
+  // New specific fields requested by user
+  const [lang, setLang] = useState("ar");
+  const [utmCampaign, setUtmCampaign] = useState("");
+  const [campaignId, setCampaignId] = useState("");
+  const [utmTerm, setUtmTerm] = useState("");
+  const [utmContent, setUtmContent] = useState("");
+
   const [campaignSource, setCampaignSource] = useState("");
   const [campaignMedium, setCampaignMedium] = useState("");
-  const [campaignName, setCampaignName] = useState("");
-  const [campaignContent, setCampaignContent] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
   const [category, setCategory] = useState("");
   const [affiliateId, setAffiliateId] = useState("");
   const [referrerId, setReferrerId] = useState("");
@@ -45,7 +50,7 @@ export default function LinkCreator({ user, onClose }: { user: User, onClose: ()
       const response = await ai.models.generateContent({
         model: "gemini-2.0-flash",
         contents: `Parse this marketing campaign request and extract tracking parameters into JSON: "${aiPrompt}". 
-        Fields: originalUrl, campaignSource, campaignMedium, campaignName, campaignContent, searchTerm, category, affiliateId, referrerId.
+        Fields: originalUrl, lang, utmCampaign, campaignId, utmTerm, utmContent, campaignSource, campaignMedium, category, affiliateId, referrerId.
         Return ONLY valid JSON.`,
         config: {
           responseMimeType: "application/json",
@@ -53,11 +58,13 @@ export default function LinkCreator({ user, onClose }: { user: User, onClose: ()
             type: Type.OBJECT,
             properties: {
               originalUrl: { type: Type.STRING },
+              lang: { type: Type.STRING },
+              utmCampaign: { type: Type.STRING },
+              campaignId: { type: Type.STRING },
+              utmTerm: { type: Type.STRING },
+              utmContent: { type: Type.STRING },
               campaignSource: { type: Type.STRING },
               campaignMedium: { type: Type.STRING },
-              campaignName: { type: Type.STRING },
-              campaignContent: { type: Type.STRING },
-              searchTerm: { type: Type.STRING },
               category: { type: Type.STRING },
               affiliateId: { type: Type.STRING },
               referrerId: { type: Type.STRING },
@@ -68,11 +75,13 @@ export default function LinkCreator({ user, onClose }: { user: User, onClose: ()
 
       const data = JSON.parse(response.text || "{}");
       if (data.originalUrl) setOriginalUrl(data.originalUrl);
+      if (data.lang) setLang(data.lang);
+      if (data.utmCampaign) setUtmCampaign(data.utmCampaign);
+      if (data.campaignId) setCampaignId(data.campaignId);
+      if (data.utmTerm) setUtmTerm(data.utmTerm);
+      if (data.utmContent) setUtmContent(data.utmContent);
       if (data.campaignSource) setCampaignSource(data.campaignSource);
       if (data.campaignMedium) setCampaignMedium(data.campaignMedium);
-      if (data.campaignName) setCampaignName(data.campaignName);
-      if (data.campaignContent) setCampaignContent(data.campaignContent);
-      if (data.searchTerm) setSearchTerm(data.searchTerm);
       if (data.category) setCategory(data.category);
       if (data.affiliateId) setAffiliateId(data.affiliateId);
       if (data.referrerId) setReferrerId(data.referrerId);
@@ -97,7 +106,7 @@ export default function LinkCreator({ user, onClose }: { user: User, onClose: ()
       const response = await ai.models.generateContent({
         model: "gemini-2.0-flash",
         contents: `Suggest 5 short, SEO-friendly, memorable URL slugs for this destination: ${originalUrl}. 
-        Context: ${campaignName || "general marketing"}.
+        Context: ${utmCampaign || "general marketing"}.
         Return ONLY a JSON array of strings.`,
         config: {
           responseMimeType: "application/json",
@@ -121,6 +130,25 @@ export default function LinkCreator({ user, onClose }: { user: User, onClose: ()
     if (!originalUrl) return;
     
     setLoading(true);
+    
+    // Construct the final URL with parameters
+    let finalUrl = originalUrl;
+    try {
+      const url = new URL(originalUrl);
+      if (lang) url.searchParams.set("lang", lang);
+      if (utmCampaign) url.searchParams.set("utm_campaign", utmCampaign);
+      if (campaignId) url.searchParams.set("campaign_id", campaignId);
+      if (utmTerm) url.searchParams.set("utm_term", utmTerm);
+      if (utmContent) url.searchParams.set("utm_content", utmContent);
+      if (campaignSource) url.searchParams.set("utm_source", campaignSource);
+      if (campaignMedium) url.searchParams.set("utm_medium", campaignMedium);
+      
+      finalUrl = url.toString();
+    } catch (e) {
+      // If originalUrl is not a valid URL yet, we'll handle it or toast error
+      console.error("Invalid URL construction", e);
+    }
+
     const id = customAlias.trim() || nanoid(6);
     
     if (id.length < 3) {
@@ -151,12 +179,14 @@ export default function LinkCreator({ user, onClose }: { user: User, onClose: ()
         await setDoc(docRef, {
           id,
           ownerUid: user.uid,
-          originalUrl,
+          originalUrl: finalUrl,
+          lang,
+          utmCampaign,
+          campaignId,
+          utmTerm,
+          utmContent,
           campaignSource,
           campaignMedium,
-          campaignName,
-          campaignContent,
-          searchTerm,
           category,
           affiliateId,
           referrerId,
@@ -229,16 +259,70 @@ export default function LinkCreator({ user, onClose }: { user: User, onClose: ()
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-              <label className="text-sm font-bold text-zinc-400 ml-1 uppercase tracking-wider">Destination URL</label>
+              <label className="text-sm font-bold text-zinc-400 ml-1 uppercase tracking-wider">Destination URL (Base)</label>
               <div className="relative">
                 <LinkIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
                 <input
                   type="url"
                   required
-                  placeholder="https://example.com/your-long-link"
+                  placeholder="https://secure.istmarkets.com/register"
                   value={originalUrl}
                   onChange={(e) => setOriginalUrl(e.target.value)}
                   className="w-full bg-zinc-800 border border-zinc-700 rounded-xl py-3 pl-12 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-orange-500/50 transition-all"
+                />
+              </div>
+            </div>
+
+            {/* Tagging Parameters Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Language (lang)</label>
+                <input
+                  type="text"
+                  placeholder="ar, en"
+                  value={lang}
+                  onChange={(e) => setLang(e.target.value)}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl py-2 px-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500/50 transition-all"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">UTM Campaign</label>
+                <input
+                  type="text"
+                  placeholder="wati, summer_sale"
+                  value={utmCampaign}
+                  onChange={(e) => setUtmCampaign(e.target.value)}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl py-2 px-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500/50 transition-all"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Campaign ID</label>
+                <input
+                  type="text"
+                  placeholder="WhatsupTemp"
+                  value={campaignId}
+                  onChange={(e) => setCampaignId(e.target.value)}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl py-2 px-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500/50 transition-all"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">UTM Term</label>
+                <input
+                  type="text"
+                  placeholder="500$"
+                  value={utmTerm}
+                  onChange={(e) => setUtmTerm(e.target.value)}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl py-2 px-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500/50 transition-all"
+                />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">UTM Content</label>
+                <input
+                  type="text"
+                  placeholder="Bonus15%"
+                  value={utmContent}
+                  onChange={(e) => setUtmContent(e.target.value)}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl py-2 px-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500/50 transition-all"
                 />
               </div>
             </div>
@@ -314,12 +398,12 @@ export default function LinkCreator({ user, onClose }: { user: User, onClose: ()
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Campaign Name</label>
+                  <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Campaign Name (Internal)</label>
                   <input
                     type="text"
                     placeholder="summer_sale"
-                    value={campaignName}
-                    onChange={(e) => setCampaignName(e.target.value)}
+                    value={utmCampaign}
+                    onChange={(e) => setUtmCampaign(e.target.value)}
                     className="w-full bg-zinc-800 border border-zinc-700 rounded-xl py-2 px-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500/50 transition-all"
                   />
                 </div>

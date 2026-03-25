@@ -60,15 +60,25 @@ service cloud.firestore {
     function isValidLink(data) {
       let required = ['id', 'ownerUid', 'originalUrl', 'createdAt', 'clickCount'];
       let allowed = ['id', 'ownerUid', 'originalUrl', 'createdAt', 'clickCount', 
-                     'campaignSource', 'campaignMedium', 'campaignName', 'campaignContent', 
-                     'searchTerm', 'category', 'affiliateId', 'referrerId'];
+                     'lang', 'utmCampaign', 'campaignId', 'utmTerm', 'utmContent',
+                     'campaignSource', 'campaignMedium', 'category', 'affiliateId', 'referrerId'];
       
       return hasRequiredFields(required) && hasOnlyAllowedFields(allowed) &&
              data.id is string && data.id.size() >= 3 && data.id.size() < 100 &&
              data.originalUrl is string && data.originalUrl.size() > 0 && data.originalUrl.size() < 2000 &&
              data.ownerUid is string && data.ownerUid.size() > 0 &&
              data.clickCount is int && data.clickCount >= 0 &&
-             data.createdAt is timestamp;
+             data.createdAt is timestamp &&
+             (!('lang' in data) || data.lang is string) &&
+             (!('utmCampaign' in data) || data.utmCampaign is string) &&
+             (!('campaignId' in data) || data.campaignId is string) &&
+             (!('utmTerm' in data) || data.utmTerm is string) &&
+             (!('utmContent' in data) || data.utmContent is string) &&
+             (!('campaignSource' in data) || data.campaignSource is string) &&
+             (!('campaignMedium' in data) || data.campaignMedium is string) &&
+             (!('category' in data) || data.category is string) &&
+             (!('affiliateId' in data) || data.affiliateId is string) &&
+             (!('referrerId' in data) || data.referrerId is string);
     }
 
     function isValidClick(data) {

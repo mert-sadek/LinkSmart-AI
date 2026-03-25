@@ -119,6 +119,12 @@ export default function Analytics({ user }: { user: User }) {
         model: "gemini-2.0-flash",
         contents: `Generate a concise, professional marketing analytics report for this link performance data: ${JSON.stringify(statsSummary)}. 
         The link is for: ${link?.originalUrl}. 
+        Campaign Details:
+        - Language: ${link?.lang || 'N/A'}
+        - UTM Campaign: ${link?.utmCampaign || 'N/A'}
+        - Campaign ID: ${link?.campaignId || 'N/A'}
+        - UTM Term: ${link?.utmTerm || 'N/A'}
+        - UTM Content: ${link?.utmContent || 'N/A'}
         Focus on identifying trends and providing actionable advice. Use markdown formatting.`
       });
 

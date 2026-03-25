@@ -77,7 +77,8 @@ export default function Dashboard({ user }: { user: User }) {
   const filteredLinks = links.filter(link => 
     link.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
     link.originalUrl.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (link.campaignName && link.campaignName.toLowerCase().includes(searchTerm.toLowerCase()))
+    (link.utmCampaign && link.utmCampaign.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (link.campaignId && link.campaignId.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   return (
@@ -162,9 +163,9 @@ export default function Dashboard({ user }: { user: User }) {
                     <h3 className="text-lg font-bold text-white truncate">
                       {link.id}
                     </h3>
-                    {link.campaignName && (
+                    {(link.utmCampaign || link.campaignId) && (
                       <span className="px-2 py-0.5 bg-orange-500/10 text-orange-500 text-xs font-bold rounded-full uppercase tracking-wider">
-                        {link.campaignName}
+                        {link.utmCampaign || link.campaignId}
                       </span>
                     )}
                   </div>
