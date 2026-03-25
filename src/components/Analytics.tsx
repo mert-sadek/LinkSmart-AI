@@ -42,9 +42,20 @@ import { format, subDays, isSameDay } from "date-fns";
 import { GoogleGenAI } from "@google/genai";
 import Markdown from "react-markdown";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
-
 const COLORS = ["#f97316", "#3b82f6", "#a855f7", "#22c55e", "#eab308"];
+
+// Lazy initialization of Gemini AI
+let aiInstance: GoogleGenAI | null = null;
+const getAi = () => {
+  if (!aiInstance) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error("GEMINI_API_KEY is not set in environment variables.");
+    }
+    aiInstance = new GoogleGenAI({ apiKey });
+  }
+  return aiInstance;
+};
 
 export default function Analytics({ user }: { user: User }) {
   const { linkId } = useParams();
@@ -99,6 +110,7 @@ export default function Analytics({ user }: { user: User }) {
     if (clicks.length === 0) return;
     setIsAiLoading(true);
     try {
+      const ai = getAi();
       const statsSummary = {
         totalClicks: clicks.length,
         devices: clicks.reduce((acc: any, c) => {

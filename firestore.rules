@@ -56,6 +56,11 @@ service cloud.firestore {
       return request.resource.data.keys().hasOnly(fields);
     }
 
+    function isClickCountIncrement() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['clickCount']) &&
+             request.resource.data.clickCount == resource.data.clickCount + 1;
+    }
+
     // Domain Validators
     function isValidLink(data) {
       let required = ['id', 'ownerUid', 'originalUrl', 'createdAt', 'clickCount'];
@@ -102,7 +107,8 @@ service cloud.firestore {
     match /links/{linkId} {
       allow read: if true;
       allow create: if isAuthenticated() && uidUnchanged() && isValidLink(request.resource.data);
-      allow update: if (isDocOwner() || isAdmin()) && uidNotModified() && isValidLink(request.resource.data);
+      allow update: if ((isDocOwner() || isAdmin()) && uidNotModified() && isValidLink(request.resource.data))
+                    || isClickCountIncrement();
       allow delete: if isDocOwner() || isAdmin();
 
       // Clicks subcollection

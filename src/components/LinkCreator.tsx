@@ -18,7 +18,18 @@ import { motion } from "motion/react";
 import { nanoid } from "nanoid";
 import { GoogleGenAI, Type } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+// Lazy initialization of Gemini AI
+let aiInstance: GoogleGenAI | null = null;
+const getAi = () => {
+  if (!aiInstance) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error("GEMINI_API_KEY is not set in environment variables.");
+    }
+    aiInstance = new GoogleGenAI({ apiKey });
+  }
+  return aiInstance;
+};
 
 export default function LinkCreator({ user, onClose }: { user: User, onClose: () => void }) {
   const [originalUrl, setOriginalUrl] = useState("");
@@ -47,6 +58,7 @@ export default function LinkCreator({ user, onClose }: { user: User, onClose: ()
     if (!aiPrompt.trim()) return;
     setIsAiLoading(true);
     try {
+      const ai = getAi();
       const response = await ai.models.generateContent({
         model: "gemini-2.0-flash",
         contents: `Parse this marketing campaign request and extract tracking parameters into JSON: "${aiPrompt}". 
@@ -103,6 +115,7 @@ export default function LinkCreator({ user, onClose }: { user: User, onClose: ()
     }
     setIsAiLoading(true);
     try {
+      const ai = getAi();
       const response = await ai.models.generateContent({
         model: "gemini-2.0-flash",
         contents: `Suggest 5 short, SEO-friendly, memorable URL slugs for this destination: ${originalUrl}. 
