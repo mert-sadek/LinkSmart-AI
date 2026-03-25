@@ -29,18 +29,26 @@ import LinkCreator from "./LinkCreator";
 import { Link as RouterLink } from "react-router-dom";
 import { format } from "date-fns";
 
-export default function Dashboard({ user }: { user: User }) {
+export default function Dashboard({ user, role }: { user: User, role: string | null }) {
   const [links, setLinks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [showCreator, setShowCreator] = useState(false);
 
   useEffect(() => {
-    const q = query(
-      collection(db, "links"),
-      where("ownerUid", "==", user.uid),
-      orderBy("createdAt", "desc")
-    );
+    let q;
+    if (role === "admin") {
+      q = query(
+        collection(db, "links"),
+        orderBy("createdAt", "desc")
+      );
+    } else {
+      q = query(
+        collection(db, "links"),
+        where("ownerUid", "==", user.uid),
+        orderBy("createdAt", "desc")
+      );
+    }
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const linksData = snapshot.docs.map(doc => ({
@@ -56,7 +64,7 @@ export default function Dashboard({ user }: { user: User }) {
     });
 
     return () => unsubscribe();
-  }, [user.uid]);
+  }, [user.uid, role]);
 
   const handleDelete = async (id: string) => {
     if (window.confirm("Are you sure you want to delete this link?")) {
@@ -85,8 +93,12 @@ export default function Dashboard({ user }: { user: User }) {
     <div className="space-y-8">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-4xl font-bold tracking-tight text-white mb-2">My Links</h1>
-          <p className="text-zinc-400">Manage and track your marketing campaigns</p>
+          <h1 className="text-4xl font-bold tracking-tight text-white mb-2">
+            {role === "admin" ? "All Links" : "My Links"}
+          </h1>
+          <p className="text-zinc-400">
+            {role === "admin" ? "Overview of all marketing campaigns" : "Manage and track your marketing campaigns"}
+          </p>
         </div>
         <button
           onClick={() => setShowCreator(true)}

@@ -62,8 +62,8 @@ export default function App() {
             path="/"
             element={user ? <Layout user={user} role={role} /> : <Navigate to="/login" />}
           >
-            <Route index element={<Dashboard user={user!} />} />
-            <Route path="analytics/:linkId" element={<Analytics user={user!} />} />
+            <Route index element={<Dashboard user={user!} role={role} />} />
+            <Route path="analytics/:linkId" element={<Analytics user={user!} role={role} />} />
             {role === "admin" && (
               <Route path="users" element={<UsersManagement />} />
             )}

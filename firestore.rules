@@ -105,7 +105,11 @@ service cloud.firestore {
 
     // Links
     match /links/{linkId} {
-      allow read: if true;
+      // Allow individual link read for redirects
+      allow get: if true;
+      // Restrict listing to owner or admin
+      allow list: if isAdmin() || (isAuthenticated() && resource.data.ownerUid == request.auth.uid);
+      
       allow create: if isAuthenticated() && uidUnchanged() && isValidLink(request.resource.data);
       allow update: if ((isDocOwner() || isAdmin()) && uidNotModified() && isValidLink(request.resource.data))
                     || isClickCountIncrement();
@@ -117,6 +121,12 @@ service cloud.firestore {
         allow create: if isValidClick(request.resource.data);
         allow update, delete: if false;
       }
+    }
+
+    // Invites collection
+    match /invites/{email} {
+      allow read: if true; // Anyone can check if they are invited
+      allow write: if isAdmin();
     }
   }
 }

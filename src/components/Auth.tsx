@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword
 } from "firebase/auth";
 import { auth, db } from "../lib/firebase";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore";
 import { toast } from "sonner";
 import { Link as LinkIcon, Mail, Lock, ArrowRight, Loader2 } from "lucide-react";
 import { motion } from "motion/react";
@@ -15,6 +15,14 @@ export default function Auth() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Check for invite mode in URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("mode") === "signup") {
+      setIsLogin(false);
+    }
+  }, []);
+
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -23,19 +31,37 @@ export default function Auth() {
         await signInWithEmailAndPassword(auth, email, password);
         toast.success("Welcome back!");
       } else {
+        // Check if invited
+        const inviteRef = doc(db, "invites", email.toLowerCase());
+        const inviteSnap = await getDoc(inviteRef);
+        
+        if (!inviteSnap.exists()) {
+          toast.error("This email is not invited. Please contact the administrator.");
+          setLoading(false);
+          return;
+        }
+
+        const inviteData = inviteSnap.data();
+        if (inviteData.status === "used") {
+          toast.error("This invite has already been used.");
+          setLoading(false);
+          return;
+        }
+
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
         
         // Create user profile in Firestore
-        // Bootstrap admin role for the specified email
-        const role = user.email === "mert.sadek.91@gmail.com" ? "admin" : "client";
-        
         await setDoc(doc(db, "users", user.uid), {
           uid: user.uid,
           email: user.email,
-          role: role,
+          role: inviteData.role || "client",
           createdAt: serverTimestamp(),
         });
+
+        // Mark invite as used
+        await setDoc(inviteRef, { status: "used" }, { merge: true });
+        
         toast.success("Account created successfully!");
       }
     } catch (error: any) {
@@ -115,13 +141,19 @@ export default function Auth() {
           </form>
 
           <p className="mt-8 text-center text-sm text-zinc-400">
-            {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
-            <button
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-orange-500 font-bold hover:underline"
-            >
-              {isLogin ? "Sign Up" : "Sign In"}
-            </button>
+            {isLogin ? (
+              "Access restricted to invited users only."
+            ) : (
+              <>
+                Already have an account?{" "}
+                <button
+                  onClick={() => setIsLogin(true)}
+                  className="text-orange-500 font-bold hover:underline"
+                >
+                  Sign In
+                </button>
+              </>
+            )}
           </p>
         </motion.div>
       </div>

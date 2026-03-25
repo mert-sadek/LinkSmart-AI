@@ -57,7 +57,7 @@ const getAi = () => {
   return aiInstance;
 };
 
-export default function Analytics({ user }: { user: User }) {
+export default function Analytics({ user, role }: { user: User, role: string | null }) {
   const { linkId } = useParams();
   const navigate = useNavigate();
   const [link, setLink] = useState<any>(null);
@@ -74,7 +74,7 @@ export default function Analytics({ user }: { user: User }) {
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
         const data = docSnap.data({ serverTimestamps: 'estimate' });
-        if (data.ownerUid !== user.uid) {
+        if (data.ownerUid !== user.uid && role !== "admin") {
           toast.error("Unauthorized access");
           navigate("/");
           return;
@@ -104,7 +104,7 @@ export default function Analytics({ user }: { user: User }) {
     });
 
     return () => unsubscribe();
-  }, [linkId, user.uid, navigate]);
+  }, [linkId, user.uid, role, navigate]);
 
   const generateAiReport = async () => {
     if (clicks.length === 0) return;
