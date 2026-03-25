@@ -1,0 +1,106 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Fields:
+    //   - uid: string (required)
+    //   - email: string (required)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: links
+    // Fields:
+    //   - id: string (required)
+    //   - ownerUid: string (required)
+    //   - originalUrl: string (required)
+    //   - clickCount: number (required)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: links/{linkId}/clicks
+    // Fields:
+    //   - linkId: string (required)
+    //   - ownerUid: string (required)
+    //   - timestamp: timestamp (required)
+    //
+    // ===============================================================
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.ownerUid;
+    }
+    function isAdmin() {
+      return isAuthenticated() &&
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "mert@istrealestate.ae" && request.auth.token.email_verified == true));
+    }
+    function uidUnchanged() {
+      return !('ownerUid' in request.resource.data) || request.resource.data.ownerUid == request.auth.uid;
+    }
+    function uidNotModified() {
+      return !('ownerUid' in request.resource.data) || request.resource.data.ownerUid == resource.data.ownerUid;
+    }
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // Domain Validators
+    function isValidLink(data) {
+      let required = ['id', 'ownerUid', 'originalUrl', 'createdAt', 'clickCount'];
+      let allowed = ['id', 'ownerUid', 'originalUrl', 'createdAt', 'clickCount', 
+                     'campaignSource', 'campaignMedium', 'campaignName', 'campaignContent', 
+                     'searchTerm', 'category', 'affiliateId', 'referrerId'];
+      
+      return hasRequiredFields(required) && hasOnlyAllowedFields(allowed) &&
+             data.id is string && data.id.size() >= 3 && data.id.size() < 100 &&
+             data.originalUrl is string && data.originalUrl.size() > 0 && data.originalUrl.size() < 2000 &&
+             data.ownerUid is string && data.ownerUid.size() > 0 &&
+             data.clickCount is int && data.clickCount >= 0 &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidClick(data) {
+      let required = ['linkId', 'ownerUid', 'timestamp'];
+      let allowed = ['linkId', 'ownerUid', 'timestamp', 'ip', 'userAgent', 'country', 'city', 'device', 'browser', 'os'];
+      return hasRequiredFields(required) && hasOnlyAllowedFields(allowed) &&
+             data.linkId is string && data.ownerUid is string && data.timestamp is timestamp;
+    }
+
+    // User profiles
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if isOwner(uid) && request.resource.data.uid == uid && 
+                    hasOnlyAllowedFields(['uid', 'email', 'displayName', 'createdAt', 'role']);
+      allow update: if isOwner(uid) && request.resource.data.uid == uid && 
+                    hasOnlyAllowedFields(['uid', 'email', 'displayName', 'createdAt', 'role']) &&
+                    (!('role' in request.resource.data) || request.resource.data.role == resource.data.role || isAdmin());
+    }
+
+    // Links
+    match /links/{linkId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && uidUnchanged() && isValidLink(request.resource.data);
+      allow update: if (isDocOwner() || isAdmin()) && uidNotModified() && isValidLink(request.resource.data);
+      allow delete: if isDocOwner() || isAdmin();
+
+      // Clicks subcollection
+      match /clicks/{clickId} {
+        allow read: if isDocOwner() || isAdmin();
+        allow create: if isValidClick(request.resource.data);
+        allow update, delete: if false;
+      }
+    }
+  }
+}

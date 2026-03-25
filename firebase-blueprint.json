@@ -1,0 +1,70 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user of the platform.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "email": { "type": "string", "format": "email", "description": "User's email" },
+        "displayName": { "type": "string", "description": "User's display name" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Account creation time" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Link": {
+      "title": "Link",
+      "description": "A shortened link created by a user.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique short code or custom alias" },
+        "ownerUid": { "type": "string", "description": "UID of the user who created the link" },
+        "originalUrl": { "type": "string", "description": "The destination URL" },
+        "shortUrl": { "type": "string", "description": "The full shortened URL" },
+        "campaignSource": { "type": "string", "description": "UTM Source" },
+        "campaignMedium": { "type": "string", "description": "UTM Medium" },
+        "campaignName": { "type": "string", "description": "UTM Name" },
+        "campaignContent": { "type": "string", "description": "UTM Content" },
+        "searchTerm": { "type": "string", "description": "UTM Term" },
+        "category": { "type": "string", "description": "Custom category" },
+        "affiliateId": { "type": "string", "description": "Affiliate ID" },
+        "referrerId": { "type": "string", "description": "Referrer ID" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation time" },
+        "clickCount": { "type": "integer", "description": "Total number of clicks" }
+      },
+      "required": ["id", "ownerUid", "originalUrl", "createdAt"]
+    },
+    "Click": {
+      "title": "Click",
+      "description": "A single click event on a short link.",
+      "type": "object",
+      "properties": {
+        "linkId": { "type": "string", "description": "ID of the link clicked" },
+        "ownerUid": { "type": "string", "description": "UID of the link owner" },
+        "timestamp": { "type": "string", "format": "date-time", "description": "Time of click" },
+        "ip": { "type": "string", "description": "IP address (anonymized or hashed if needed)" },
+        "userAgent": { "type": "string", "description": "Browser user agent" },
+        "country": { "type": "string", "description": "Country code" },
+        "city": { "type": "string", "description": "City name" },
+        "device": { "type": "string", "description": "Device type (mobile, desktop, tablet)" },
+        "browser": { "type": "string", "description": "Browser name" },
+        "os": { "type": "string", "description": "Operating system" }
+      },
+      "required": ["linkId", "ownerUid", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/links/{linkId}": {
+      "schema": "Link",
+      "description": "Short links"
+    },
+    "/links/{linkId}/clicks/{clickId}": {
+      "schema": "Click",
+      "description": "Click events for a specific link"
+    }
+  }
+}
