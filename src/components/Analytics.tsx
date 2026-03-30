@@ -68,22 +68,14 @@ export default function Analytics({ user, role }: { user: User, role: string | n
       try {
         const token = localStorage.getItem("token");
         
-        // Fetch link details
-        const linkRes = await fetch(`/api/links/${linkId}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (!linkRes.ok) throw new Error("Link not found");
-        const linkData = await linkRes.json();
-        setLink(linkData);
-
-        // Fetch clicks
+        // Fetch analytics (includes link and clicks)
         const clicksRes = await fetch(`/api/analytics/${linkId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        if (clicksRes.ok) {
-          const clicksData = await clicksRes.json();
-          setClicks(clicksData);
-        }
+        if (!clicksRes.ok) throw new Error("Analytics not found");
+        const analyticsData = await clicksRes.json();
+        setLink(analyticsData.link);
+        setClicks(analyticsData.clicks);
       } catch (error) {
         console.error("Analytics error:", error);
         toast.error("Failed to load analytics");
